@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FactSphere · Search Hallucination Rater</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<div class="bg-pattern"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo"><span class="logo-icon">🔮</span> FactSphere</div>
+    <p class="tagline">Search the web · Rate hallucination per source · Powered by Groq Cloud LLM</p>
+    <div class="header-badge">Multi-Engine · Real-time Scoring · Free API</div>
+  </header>
+
+  <!-- Eye Following Hero -->
+  <div class="eye-hero" id="eye-hero">
+    <div class="eye-card">
+      <div class="eye-outer">
+        <div class="eye-iris" id="eye-iris">
+          <div class="eye-pupil"></div>
+        </div>
+      </div>
+      <span class="eye-label">AI is watching your facts</span>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="glass-panel" id="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">
+        <span>⚙️</span> <span>API Settings</span>
+        <span class="key-badge" id="key-status-badge" style="display:none">✅ Saved</span>
+      </div>
+      <button class="toggle-btn" id="toggle-settings-btn" onclick="toggleSettings()">▼ Show</button>
+    </div>
+    <div id="settings-body" style="display:none">
+      <div class="api-row">
+        <input class="search-input" id="api-key-input" type="password" placeholder="🔑 Groq API Key (gsk_...)" autocomplete="off" />
+      </div>
+      <p class="api-hint">Get your free Groq key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create.</p>
+      <div class="api-row">
+        <input class="search-input" id="google-api-key-input" type="password" placeholder="🔑 Google API Key" autocomplete="off" />
+        <input class="search-input" id="google-cx-input" type="text" placeholder="🔎 Google Search Engine ID (CX)" autocomplete="off" />
+      </div>
+      <p class="api-hint">Google credentials: <a href="https://console.cloud.google.com/apis/credentials" target="_blank">API Key</a> · <a href="https://programmablesearchengine.google.com/" target="_blank">Search Engine ID</a> (100 free/day).</p>
+      <div style="display:flex;gap:.5rem;margin-top:.4rem">
+        <button class="btn-save" onclick="saveAllKeys()">💾 Save All Keys</button>
+        <button class="btn-clear" onclick="clearAllKeys()">🗑️ Clear All</button>
+      </div>
+      <p class="api-hint" style="margin-top:.4rem">All keys stored locally in your browser only.</p>
+    </div>
+  </div>
+
+  <!-- Search Panel -->
+  <div class="glass-panel">
+    <div class="search-row">
+      <input class="search-input" id="query-input" type="text" placeholder="Ask anything… e.g. Who invented the telephone?" autocomplete="off" />
+      <select id="model-select" class="model-select" title="Select Groq model">
+        <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+        <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+        <option value="meta-llama/llama-4-scout-17b-16e-instruct">llama-4-scout-17b</option>
+        <option value="qwen/qwen3-32b">qwen3-32b</option>
+      </select>
+      <button class="person-search-btn" id="person-search-btn" onclick="enterPersonMode(this)">🍷 Search Person</button>
+      <button class="search-btn" id="search-btn" onclick="doSearch()">🔍 Search & Rate</button>
+    </div>
+    <div id="status-msg">Enter a question and click Search — results will be scored for hallucination.</div>
+  </div>
+
+  <!-- ═══ Fact-Check Section (hidden in person mode) ═══ -->
+  <div id="factcheck-section">
+
+  <!-- Summary Bar -->
+  <div id="summary-bar">
+    <div class="summary-item">
+      <span class="summary-label">Sources Checked</span>
+      <span class="summary-value" id="sum-count">—</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Avg Hallucination</span>
+      <span class="summary-value" id="sum-avg">—</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Overall Risk</span>
+      <span class="summary-value" id="sum-verdict">—</span>
+    </div>
+    <div class="avg-track"><div class="avg-fill" id="avg-fill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Direct Answer Box -->
+  <div id="direct-answer-box" style="display:none">
+    <div class="answer-label">✨ Direct Answer</div>
+    <div class="answer-text" id="direct-answer-text"></div>
+  </div>
+
+  <!-- Category Filter Tabs -->
+  <div id="category-tabs" style="display:none">
+    <button class="cat-tab cat-reliable active" id="tab-all" onclick="filterCategory('all')">
+      <span class="cat-icon">📋</span>
+      <span class="cat-name">All Results</span>
+      <span class="cat-count" id="count-all">0</span>
+    </button>
+    <button class="cat-tab cat-reliable" id="tab-reliable" onclick="filterCategory('reliable')">
+      <span class="cat-icon">🟢</span>
+      <span class="cat-name">Reliable</span>
+      <span class="cat-count" id="count-reliable">0</span>
+    </button>
+    <button class="cat-tab cat-uncertain" id="tab-uncertain" onclick="filterCategory('uncertain')">
+      <span class="cat-icon">🟡</span>
+      <span class="cat-name">Uncertain</span>
+      <span class="cat-count" id="count-uncertain">0</span>
+    </button>
+    <button class="cat-tab cat-hallucinated" id="tab-hallucinated" onclick="filterCategory('hallucinated')">
+      <span class="cat-icon">🔴</span>
+      <span class="cat-name">Likely Hallucinated</span>
+      <span class="cat-count" id="count-hallucinated">0</span>
+    </button>
+  </div>
+
+  <!-- Results Grid -->
+  <div id="results-grid"></div>
+
+  <!-- Empty State -->
+  <div id="empty-state">
+    <div class="empty-icon">🕵️</div>
+    <div class="empty-title">No results found</div>
+    <div class="empty-sub">Try a different query or check your internet connection.</div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend" id="legend" style="display:none">
+    <div class="legend-item"><span class="legend-dot dot-green"></span> 0–29% Reliable</div>
+    <div class="legend-item"><span class="legend-dot dot-yellow"></span> 30–59% Uncertain</div>
+    <div class="legend-item"><span class="legend-dot dot-red"></span> 60–100% Likely Hallucinated</div>
+  </div>
+
+  </div><!-- /factcheck-section -->
+
+  <!-- ═══ Person Search Panel (shown in wine mode) ═══ -->
+  <div id="person-panel">
+    <div class="person-mode-header">
+      <div>
+        <div class="person-title">🍷 Person Lookup</div>
+        <div class="person-subtitle">Search LinkedIn profiles · Get education, certifications & career data</div>
+      </div>
+      <button class="person-back-btn" onclick="exitPersonMode()">← Back to Fact Check</button>
+    </div>
+
+    <!-- RapidAPI Key -->
+    <div class="glass-panel" style="padding:1rem 1.4rem;margin-bottom:1rem">
+      <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <span style="font-size:.82rem;font-weight:600;color:var(--text-muted)">🔑 RapidAPI Key</span>
+        <input class="search-input" id="rapidapi-key-input" type="password" placeholder="Enter RapidAPI key (subscribe to LinkedIn Data API)" autocomplete="off" style="flex:1;min-width:200px" />
+        <button class="csv-btn" onclick="saveRapidApiKey()" style="padding:.5rem 1rem;font-size:.78rem">💾 Save</button>
+      </div>
+      <p class="api-hint" style="margin-top:.4rem">Get a free key: <a href="https://rapidapi.com/rockapis-rockapis-default/api/linkedin-api8" target="_blank">RapidAPI → LinkedIn Data API</a> → Subscribe (free tier).</p>
+    </div>
+
+    <!-- Mode Tabs: Single vs Bulk -->
+    <div class="person-mode-tabs">
+      <button class="person-mode-tab active" id="tab-single" onclick="switchPersonTab('single')">
+        <span class="tab-icon">👤</span>
+        <span class="tab-label">One Person</span>
+      </button>
+      <button class="person-mode-tab" id="tab-bulk" onclick="switchPersonTab('bulk')">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">Many People (CSV)</span>
+      </button>
+    </div>
+
+    <!-- Single Person Panel -->
+    <div id="single-person-panel" class="glass-panel">
+      <div class="person-search-row">
+        <input class="search-input" id="person-name-input" type="text" placeholder="Enter full name… e.g. Satya Nadella" autocomplete="off" />
+        <input class="search-input" id="person-linkedin-input" type="text" placeholder="Or paste LinkedIn URL (optional)" autocomplete="off" />
+        <button class="csv-btn" id="person-search-go" onclick="doPersonSearch()">🔍 Search</button>
+      </div>
+      <div id="person-status"></div>
+      <div id="person-results"></div>
+    </div>
+
+    <!-- Bulk Person Panel -->
+    <div id="bulk-person-panel" class="glass-panel">
+      <div class="csv-upload-area" id="csv-drop-area" onclick="document.getElementById('csv-file-input').click()">
+        <div class="csv-upload-icon">📄</div>
+        <div class="csv-upload-title">Drop CSV file here or click to browse</div>
+        <div class="csv-upload-sub">CSV should have one name per row in the first column</div>
+        <div class="csv-file-name" id="csv-file-name"></div>
+      </div>
+      <input type="file" id="csv-file-input" accept=".csv" style="display:none" />
+      <div class="csv-actions">
+        <button class="csv-btn" id="csv-upload-btn" onclick="doBulkSearch()" disabled>🚀 Process & Download</button>
+        <button class="csv-btn secondary" onclick="clearCsvFile()">🗑️ Clear</button>
+      </div>
+      <div class="csv-progress" id="csv-progress">
+        <span id="csv-progress-text">Processing…</span>
+        <div class="csv-progress-bar"><div class="csv-progress-fill" id="csv-progress-fill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Material Chips -->
+  <div class="material-chips">
+    <div class="chip">🧠 Multi-Agent Pipeline</div>
+    <div class="chip">🔒 Privacy First</div>
+    <div class="chip">⚡ Groq Inference</div>
+    <div class="chip">🌐 Multi-Engine Search</div>
+    <div class="chip">📊 Real-time Scoring</div>
+  </div>
+
+</div>
+
+<!-- Wine Transition Overlay -->
+<div class="wine-transition-overlay" id="wine-overlay"></div>
+
+<!-- Quota Counter -->
+<div class="quota-counter" id="quota-counter">
+  🔍 Google: <span class="q-num" id="quota-num">100</span>/100 left today
+</div>
+
+
+<script>
+/* ── Eye Following Logic ── */
+(function(){
+  const iris = document.getElementById('eye-iris');
+  const hero = document.getElementById('eye-hero');
+  if(!iris||!hero) return;
+  const maxMove = 18;
+  document.addEventListener('mousemove', e => {
+    const rect = hero.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const clamp = Math.min(dist, 300) / 300;
+    const angle = Math.atan2(dy, dx);
+    const mx = Math.cos(angle) * maxMove * clamp;
+    const my = Math.sin(angle) * maxMove * clamp;
+    iris.style.transform = `translate(${mx}px, ${my}px)`;
+  });
+})();
+
+const BACKEND = "http://localhost:5050";
+const STORAGE_KEY = "factsphere_groq_api_key";
+const STORAGE_GOOGLE_KEY = "factsphere_google_api_key";
+const STORAGE_GOOGLE_CX = "factsphere_google_cx";
+
+function saveAllKeys(){
+  const groqKey = document.getElementById("api-key-input").value.trim();
+  const googleKey = document.getElementById("google-api-key-input").value.trim();
+  const googleCx = document.getElementById("google-cx-input").value.trim();
+  if(!groqKey){setStatus("⚠️ Please enter at least a Groq API key.",true);return}
+  localStorage.setItem(STORAGE_KEY, groqKey);
+  if(googleKey) localStorage.setItem(STORAGE_GOOGLE_KEY, googleKey);
+  if(googleCx) localStorage.setItem(STORAGE_GOOGLE_CX, googleCx);
+  updateKeyStatus();
+  document.getElementById("settings-body").style.display="none";
+  document.getElementById("toggle-settings-btn").textContent="▼ Show";
+  const parts=["Groq"];if(googleKey&&googleCx)parts.push("Google");
+  setStatus(`✅ ${parts.join(" + ")} key(s) saved!`);updateQuotaUI();
+}
+function clearAllKeys(){
+  localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(STORAGE_GOOGLE_KEY);localStorage.removeItem(STORAGE_GOOGLE_CX);
+  document.getElementById("api-key-input").value="";
+  document.getElementById("google-api-key-input").value="";
+  document.getElementById("google-cx-input").value="";
+  updateKeyStatus();setStatus("🗑️ All keys cleared.");updateQuotaUI();
+}
+function loadAllKeys(){
+  const g=localStorage.getItem(STORAGE_KEY),gk=localStorage.getItem(STORAGE_GOOGLE_KEY),gc=localStorage.getItem(STORAGE_GOOGLE_CX);
+  if(g)document.getElementById("api-key-input").value=g;
+  if(gk)document.getElementById("google-api-key-input").value=gk;
+  if(gc)document.getElementById("google-cx-input").value=gc;
+  updateKeyStatus();
+  if(g){document.getElementById("settings-body").style.display="none";document.getElementById("toggle-settings-btn").textContent="▼ Show"}
+  else{document.getElementById("settings-body").style.display="block";document.getElementById("toggle-settings-btn").textContent="▲ Hide"}
+}
+function updateKeyStatus(){
+  const b=document.getElementById("key-status-badge");
+  const hg=!!localStorage.getItem(STORAGE_KEY),hG=!!localStorage.getItem(STORAGE_GOOGLE_KEY)&&!!localStorage.getItem(STORAGE_GOOGLE_CX);
+  if(hg){b.style.display="inline-block";b.textContent=hG?"✅ Groq + Google":"✅ Groq Saved"}else{b.style.display="none"}
+}
+function toggleSettings(){
+  const body=document.getElementById("settings-body"),btn=document.getElementById("toggle-settings-btn");
+  if(body.style.display==="none"){body.style.display="block";btn.textContent="▲ Hide"}
+  else{body.style.display="none";btn.textContent="▼ Show"}
+}
+function getApiKey(){const v=document.getElementById("api-key-input").value.trim();return v||localStorage.getItem(STORAGE_KEY)||""}
+function getGoogleApiKey(){const v=document.getElementById("google-api-key-input").value.trim();return v||localStorage.getItem(STORAGE_GOOGLE_KEY)||""}
+function getGoogleCx(){const v=document.getElementById("google-cx-input").value.trim();return v||localStorage.getItem(STORAGE_GOOGLE_CX)||""}
+loadAllKeys();
+
+const QUOTA_KEY="factsphere_google_quota",QUOTA_MAX=100;
+function getQuotaData(){const t=new Date().toISOString().slice(0,10);try{const d=JSON.parse(localStorage.getItem(QUOTA_KEY));if(d&&d.date===t)return d}catch{}const f={date:t,used:0};localStorage.setItem(QUOTA_KEY,JSON.stringify(f));return f}
+function getQuotaRemaining(){return Math.max(0,QUOTA_MAX-getQuotaData().used)}
+function decrementQuota(){const d=getQuotaData();d.used=Math.min(QUOTA_MAX,d.used+1);localStorage.setItem(QUOTA_KEY,JSON.stringify(d));updateQuotaUI()}
+function updateQuotaUI(){const el=document.getElementById("quota-counter"),n=document.getElementById("quota-num");const h=getGoogleApiKey()&&getGoogleCx();if(!h){el.style.display="none";return}const r=getQuotaRemaining();el.style.display="block";n.textContent=r;n.className="q-num"+(r<=10?" crit":r<=30?" low":"")}
+updateQuotaUI();
+
+document.getElementById("query-input").addEventListener("keydown",e=>{if(e.key==="Enter")doSearch()});
+
+function pilClass(s){if(s==="DuckDuckGo")return"pill-ddg";if(s==="Google")return"pill-google";if(s==="Bing")return"pill-bing";return"pill-other"}
+function verdictClass(s){if(s<30)return"reliable";if(s<60)return"uncertain";return"danger"}
+function verdictLabel(s){if(s<30)return"🟢 Reliable";if(s<60)return"🟡 Uncertain";return"🔴 Likely Hallucinated"}
+function badgeClass(s){if(s<30)return"badge-reliable";if(s<60)return"badge-uncertain";return"badge-danger"}
+function gaugeColor(s){if(s<30)return"#34c759";if(s<60)return"#ff9f0a";return"#ff3b30"}
+function setStatus(m,e=false){const el=document.getElementById("status-msg");el.textContent=m;el.className=e?"error":""}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+
+function showSkeletons(n){
+  const g=document.getElementById("results-grid");g.innerHTML="";
+  for(let i=0;i<n;i++){g.insertAdjacentHTML("beforeend",`
+    <div class="skeleton" style="animation-delay:${i*0.08}s">
+      <div class="skel-line" style="height:12px;width:60%;margin-bottom:1rem"></div>
+      <div class="skel-line" style="height:10px;width:90%"></div>
+      <div class="skel-line" style="height:10px;width:75%"></div>
+      <div class="skel-line" style="height:10px;width:82%"></div>
+      <div style="margin-top:1rem;display:flex;gap:.8rem;align-items:center">
+        <div class="skel-line" style="height:56px;width:56px;flex-shrink:0;border-radius:50%"></div>
+        <div style="flex:1"><div class="skel-line" style="height:12px;width:50%"></div><div class="skel-line" style="height:10px;width:80%"></div></div>
+      </div>
+    </div>`)}
+}
+
+function renderCard(item,idx){
+  const vc=verdictClass(item.score),color=gaugeColor(item.score),r=26,circ=2*Math.PI*r;
+  const offset=circ-(item.score/100)*circ,delay=idx*0.07;
+  const t=escHtml(item.title||item.source),sn=escHtml(item.snippet||""),rs=escHtml(item.reason||""),u=escHtml(item.url||"#");
+  const du=(item.url||"").replace(/^https?:\/\//,"").split("/")[0];
+  const cat=item.score<30?"reliable":item.score<60?"uncertain":"hallucinated";
+  return `<div class="card ${vc}" data-category="${cat}" style="animation-delay:${delay}s">
+    <div class="card-header"><span class="source-pill ${pilClass(item.source)}">${escHtml(item.source)}</span><span class="card-title">${t}</span></div>
+    <a class="card-url" href="${u}" target="_blank" rel="noopener">${du||u}</a>
+    <p class="card-snippet">${sn}</p>
+    <div class="gauge-row">
+      <div class="gauge-ring-wrap"><svg width="60" height="60" viewBox="0 0 68 68">
+        <circle class="gauge-bg" cx="34" cy="34" r="${r}"/>
+        <circle class="gauge-arc" cx="34" cy="34" r="${r}" stroke="${color}" style="stroke-dasharray:${circ.toFixed(1)};stroke-dashoffset:${circ.toFixed(1)}" data-offset="${offset.toFixed(1)}" id="arc-${idx}"/>
+      </svg><div class="gauge-center" style="color:${color}">${item.score}%</div></div>
+      <div class="gauge-info"><div class="verdict-badge ${badgeClass(item.score)}">${verdictLabel(item.score)}</div><p class="gauge-reason">${rs}</p></div>
+    </div></div>`;
+}
+
+function animateArcs(){document.querySelectorAll(".gauge-arc").forEach(a=>{const t=parseFloat(a.dataset.offset);setTimeout(()=>{a.style.strokeDashoffset=t},50)})}
+
+/* ── Category Filter ── */
+let currentFilter = 'all';
+function filterCategory(cat){
+  currentFilter = cat;
+  // Update active tab
+  document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(`tab-${cat}`).classList.add('active');
+  // Filter cards
+  document.querySelectorAll('#results-grid .card').forEach(card=>{
+    if(cat==='all'||card.dataset.category===cat){
+      card.style.display='';
+      card.style.animation='fadeUp .4s ease both';
+    } else {
+      card.style.display='none';
+    }
+  });
+  animateArcs();
+}
+
+async function doSearch(){
+  const query=document.getElementById("query-input").value.trim();
+  const model=document.getElementById("model-select").value;
+  const api_key=getApiKey(),google_api_key=getGoogleApiKey(),google_cx=getGoogleCx();
+  if(!api_key){setStatus("⚠️ Enter your Groq API key first.",true);return}
+  if(!query){setStatus("⚠️ Enter a question first.",true);return}
+  document.getElementById("empty-state").classList.remove("visible");
+  document.getElementById("summary-bar").classList.remove("visible");
+  document.getElementById("direct-answer-box").style.display="none";
+  document.getElementById("category-tabs").style.display="none";
+  document.getElementById("legend").style.display="none";
+  document.getElementById("search-btn").disabled=true;
+  currentFilter='all';
+  showSkeletons(6);
+  const eng=google_api_key&&google_cx?"Google API, Bing & DuckDuckGo":"Bing & DuckDuckGo";
+  setStatus(`🔍 Searching ${eng} for "${query}" (${model})…`);
+  try{
+    const res=await fetch(`${BACKEND}/search`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,model,api_key,google_api_key,google_cx})});
+    if(!res.ok)throw new Error(`Server error: ${res.status}`);
+    const data=await res.json();
+    const grid=document.getElementById("results-grid");grid.innerHTML="";
+    if(!data.results||data.results.length===0){document.getElementById("empty-state").classList.add("visible");setStatus("No results returned.")}
+    else{
+      // Show direct answer
+      if(data.direct_answer){
+        document.getElementById("direct-answer-text").textContent=data.direct_answer;
+        document.getElementById("direct-answer-box").style.display="block";
+      }
+
+      // Render cards
+      grid.innerHTML=data.results.map((it,i)=>renderCard(it,i)).join("");animateArcs();
+      const avg=data.avg_hallucination??0,vc=verdictClass(avg);
+      document.getElementById("sum-count").textContent=`${data.results.length}`;
+      document.getElementById("sum-avg").textContent=`${avg.toFixed(1)}%`;
+      document.getElementById("sum-avg").className=`summary-value ${vc}`;
+      document.getElementById("sum-verdict").textContent=verdictLabel(avg);
+      document.getElementById("sum-verdict").className=`summary-value ${vc}`;
+      document.getElementById("avg-fill").style.width=`${avg}%`;
+      document.getElementById("summary-bar").classList.add("visible");
+      document.getElementById("legend").style.display="flex";
+
+      // Update category tabs
+      const cats=data.categories||{reliable:0,uncertain:0,hallucinated:0};
+      document.getElementById("count-all").textContent=data.results.length;
+      document.getElementById("count-reliable").textContent=cats.reliable||0;
+      document.getElementById("count-uncertain").textContent=cats.uncertain||0;
+      document.getElementById("count-hallucinated").textContent=cats.hallucinated||0;
+      document.getElementById("category-tabs").style.display="flex";
+      // Reset active tab
+      document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+      document.getElementById('tab-all').classList.add('active');
+
+      setStatus(`✅ Scored ${data.results.length} results using ${model}.`);
+      if(google_api_key&&google_cx)decrementQuota();
+    }
+  }catch(err){document.getElementById("results-grid").innerHTML="";setStatus(`❌ ${err.message} — Is search_backend.py running on port 5050?`,true)}
+  finally{document.getElementById("search-btn").disabled=false}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PERSON SEARCH MODE  –  Wine Theme + LinkedIn Lookup
+   ═══════════════════════════════════════════════════════════════ */
+
+const RAPIDAPI_STORAGE_KEY = "factsphere_rapidapi_key";
+let isWineMode = false;
+
+/* ── Wine Drop Animation ── */
+function playWineTransition(originEl, toWine = true) {
+  const overlay = document.getElementById("wine-overlay");
+  overlay.innerHTML = "";
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  // Main drop
+  const drop = document.createElement("div");
+  drop.className = toWine ? "wine-drop" : "dark-drop";
+  drop.style.left = (cx - 20) + "px";
+  drop.style.top = (cy - 20) + "px";
+  requestAnimationFrame(() => drop.classList.add("animate"));
+  overlay.appendChild(drop);
+
+  // Ripple rings (staggered)
+  for (let i = 0; i < 3; i++) {
+    const ripple = document.createElement("div");
+    ripple.className = "wine-ripple";
+    ripple.style.left = (cx - 20) + "px";
+    ripple.style.top = (cy - 20) + "px";
+    ripple.style.animationDelay = (i * 0.15) + "s";
+    if (!toWine) ripple.style.borderColor = "rgba(20,20,24,0.3)";
+    setTimeout(() => { ripple.classList.add("animate"); overlay.appendChild(ripple); }, i * 150);
+  }
+
+  // Splash particles
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement("div");
+    p.className = "wine-particle";
+    const angle = (Math.PI * 2 / 12) * i;
+    const dist = 60 + Math.random() * 80;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist;
+    p.style.left = cx + "px";
+    p.style.top = cy + "px";
+    if (!toWine) p.style.background = "rgba(20,20,24,0.6)";
+    p.style.animation = `wineParticle ${0.6 + Math.random() * 0.5}s ease-out forwards`;
+    p.style.setProperty("--tx", tx + "px");
+    p.style.setProperty("--ty", ty + "px");
+    // Override the keyframe with inline transform
+    p.animate([
+      { transform: "translate(0,0) scale(1)", opacity: 1 },
+      { transform: `translate(${tx}px,${ty}px) scale(0)`, opacity: 0 }
+    ], { duration: 600 + Math.random() * 500, easing: "ease-out", fill: "forwards" });
+    overlay.appendChild(p);
+  }
+
+  // Cleanup after animation
+  setTimeout(() => { overlay.innerHTML = ""; }, 2000);
+}
+
+/* ── Enter/Exit Person Mode ── */
+function enterPersonMode(btn) {
+  if (isWineMode) return;
+  isWineMode = true;
+  playWineTransition(btn, true);
+  setTimeout(() => {
+    document.body.classList.add("wine-mode");
+    document.getElementById("factcheck-section").classList.add("hidden");
+    document.getElementById("person-panel").classList.add("visible");
+    loadRapidApiKey();
+  }, 300);
+}
+
+function exitPersonMode() {
+  if (!isWineMode) return;
+  isWineMode = false;
+  const backBtn = document.querySelector(".person-back-btn");
+  playWineTransition(backBtn, false);
+  setTimeout(() => {
+    document.body.classList.remove("wine-mode");
+    document.getElementById("person-panel").classList.remove("visible");
+    document.getElementById("factcheck-section").classList.remove("hidden");
+  }, 300);
+}
+
+/* ── RapidAPI Key Management ── */
+function saveRapidApiKey() {
+  const key = document.getElementById("rapidapi-key-input").value.trim();
+  if (!key) { setPersonStatus("⚠️ Please enter your RapidAPI key.", true); return; }
+  localStorage.setItem(RAPIDAPI_STORAGE_KEY, key);
+  setPersonStatus("✅ RapidAPI key saved!");
+}
+function loadRapidApiKey() {
+  const key = localStorage.getItem(RAPIDAPI_STORAGE_KEY);
+  if (key) document.getElementById("rapidapi-key-input").value = key;
+}
+function getRapidApiKey() {
+  return document.getElementById("rapidapi-key-input").value.trim() || localStorage.getItem(RAPIDAPI_STORAGE_KEY) || "";
+}
+
+/* ── Person Tab Switching ── */
+function switchPersonTab(tab) {
+  document.getElementById("tab-single").classList.toggle("active", tab === "single");
+  document.getElementById("tab-bulk").classList.toggle("active", tab === "bulk");
+  document.getElementById("single-person-panel").style.display = tab === "single" ? "block" : "none";
+  document.getElementById("bulk-person-panel").style.display = tab === "bulk" ? "block" : "none";
+}
+
+/* ── Person Status ── */
+function setPersonStatus(msg, isErr = false) {
+  const el = document.getElementById("person-status");
+  el.textContent = msg;
+  el.className = isErr ? "error" : "";
+}
+
+/* ── Single Person Search ── */
+document.getElementById("person-name-input").addEventListener("keydown", e => { if (e.key === "Enter") doPersonSearch(); });
+
+async function doPersonSearch() {
+  const name = document.getElementById("person-name-input").value.trim();
+  const linkedinUrl = document.getElementById("person-linkedin-input").value.trim();
+  const rapidapiKey = getRapidApiKey();
+
+  if (!name && !linkedinUrl) { setPersonStatus("⚠️ Enter a name or LinkedIn URL.", true); return; }
+  if (!rapidapiKey) { setPersonStatus("⚠️ Enter your RapidAPI key first.", true); return; }
+
+  document.getElementById("person-search-go").disabled = true;
+  document.getElementById("person-results").innerHTML = `
+    <div class="person-skeleton">
+      <div class="skel-line" style="height:14px;width:40%;margin-bottom:1rem"></div>
+      <div class="skel-line" style="height:10px;width:70%"></div>
+      <div class="skel-line" style="height:10px;width:55%"></div>
+      <div class="skel-line" style="height:10px;width:65%"></div>
+    </div>`;
+  setPersonStatus(`🔍 Searching for "${name || linkedinUrl}"…`);
+
+  try {
+    const res = await fetch(`${BACKEND}/person-search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, linkedin_url: linkedinUrl, rapidapi_key: rapidapiKey }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      document.getElementById("person-results").innerHTML = "";
+      setPersonStatus(`❌ ${data.error || "Search failed."}`, true);
+      return;
+    }
+    renderProfile(data.profile, data.linkedin_url);
+    setPersonStatus(`✅ Found profile for ${data.profile.name || name}.`);
+  } catch (err) {
+    document.getElementById("person-results").innerHTML = "";
+    setPersonStatus(`❌ ${err.message} — Is backend running?`, true);
+  } finally {
+    document.getElementById("person-search-go").disabled = false;
+  }
+}
+
+/* ── Render LinkedIn Profile Card ── */
+function renderProfile(p, linkedinUrl) {
+  const container = document.getElementById("person-results");
+  const pic = p.profile_pic
+    ? `<img class="profile-pic" src="${escHtml(p.profile_pic)}" alt="${escHtml(p.name)}" onerror="this.outerHTML='<div class=\\'profile-pic-placeholder\\'>👤</div>'">`
+    : `<div class="profile-pic-placeholder">👤</div>`;
+
+  let eduHtml = "";
+  if (p.education && p.education.length) {
+    eduHtml = `<div class="profile-section">
+      <div class="profile-section-title">🎓 Education</div>
+      ${p.education.map(e => `
+        <div class="profile-item">
+          <div class="profile-item-title">${escHtml(e.school)}</div>
+          <div class="profile-item-sub">${escHtml(e.degree)}${e.field ? " in " + escHtml(e.field) : ""}</div>
+          <div class="profile-item-dates">${escHtml(e.start)}${e.end ? " – " + escHtml(e.end) : ""}</div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  let expHtml = "";
+  if (p.experience && p.experience.length) {
+    expHtml = `<div class="profile-section">
+      <div class="profile-section-title">💼 Experience</div>
+      ${p.experience.map(e => `
+        <div class="profile-item">
+          <div class="profile-item-title">${escHtml(e.title)}</div>
+          <div class="profile-item-sub">${escHtml(e.company)}${e.location ? " · " + escHtml(e.location) : ""}</div>
+          <div class="profile-item-dates">${escHtml(e.start)}${e.end ? " – " + escHtml(e.end) : ""}</div>
+          ${e.description ? `<div class="profile-item-desc">${escHtml(e.description)}</div>` : ""}
+        </div>`).join("")}
+    </div>`;
+  }
+
+  let certHtml = "";
+  if (p.certifications && p.certifications.length) {
+    certHtml = `<div class="profile-section">
+      <div class="profile-section-title">📜 Certifications</div>
+      ${p.certifications.map(c => `
+        <div class="profile-item">
+          <div class="profile-item-title">${escHtml(c.name)}</div>
+          <div class="profile-item-sub">${escHtml(c.authority)}</div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  let skillsHtml = "";
+  if (p.skills && p.skills.length) {
+    skillsHtml = `<div class="profile-section">
+      <div class="profile-section-title">🛠️ Skills</div>
+      <div class="skills-grid">${p.skills.map(s => `<span class="skill-chip">${escHtml(s)}</span>`).join("")}</div>
+    </div>`;
+  }
+
+  let langHtml = "";
+  if (p.languages && p.languages.length) {
+    langHtml = `<div class="profile-section">
+      <div class="profile-section-title">🌐 Languages</div>
+      <div class="skills-grid">${p.languages.map(l => `<span class="skill-chip">${escHtml(l)}</span>`).join("")}</div>
+    </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="profile-card">
+      <div class="profile-header">
+        ${pic}
+        <div>
+          <div class="profile-name">${escHtml(p.name)}</div>
+          <div class="profile-headline">${escHtml(p.headline)}</div>
+          <div class="profile-location">📍 ${escHtml(p.location || "Location not available")}</div>
+          ${p.connections ? `<div class="profile-connections">🔗 ${p.connections}+ connections</div>` : ""}
+          ${linkedinUrl ? `<a href="${escHtml(linkedinUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:.3rem;font-size:.72rem;color:#f48fb1;text-decoration:none">View on LinkedIn ↗</a>` : ""}
+        </div>
+      </div>
+      ${p.summary ? `<div class="profile-summary">${escHtml(p.summary)}</div>` : ""}
+      ${eduHtml}
+      ${expHtml}
+      ${certHtml}
+      ${skillsHtml}
+      ${langHtml}
+    </div>`;
+}
+
+/* ── CSV / Bulk Upload ── */
+const csvDropArea = document.getElementById("csv-drop-area");
+const csvFileInput = document.getElementById("csv-file-input");
+let selectedCsvFile = null;
+
+// Drag & drop
+csvDropArea.addEventListener("dragover", e => { e.preventDefault(); csvDropArea.classList.add("dragover"); });
+csvDropArea.addEventListener("dragleave", () => csvDropArea.classList.remove("dragover"));
+csvDropArea.addEventListener("drop", e => {
+  e.preventDefault(); csvDropArea.classList.remove("dragover");
+  if (e.dataTransfer.files.length) handleCsvFile(e.dataTransfer.files[0]);
+});
+csvFileInput.addEventListener("change", e => { if (e.target.files.length) handleCsvFile(e.target.files[0]); });
+
+function handleCsvFile(file) {
+  if (!file.name.endsWith(".csv")) { setPersonStatus("⚠️ Please upload a .csv file.", true); return; }
+  selectedCsvFile = file;
+  document.getElementById("csv-file-name").textContent = `📎 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  document.getElementById("csv-file-name").style.display = "block";
+  document.getElementById("csv-upload-btn").disabled = false;
+}
+
+function clearCsvFile() {
+  selectedCsvFile = null;
+  csvFileInput.value = "";
+  document.getElementById("csv-file-name").style.display = "none";
+  document.getElementById("csv-upload-btn").disabled = true;
+  document.getElementById("csv-progress").style.display = "none";
+}
+
+async function doBulkSearch() {
+  if (!selectedCsvFile) { setPersonStatus("⚠️ Select a CSV file first.", true); return; }
+  const rapidapiKey = getRapidApiKey();
+  if (!rapidapiKey) { setPersonStatus("⚠️ Enter your RapidAPI key first.", true); return; }
+
+  document.getElementById("csv-upload-btn").disabled = true;
+  document.getElementById("csv-progress").style.display = "block";
+  document.getElementById("csv-progress-text").textContent = "Uploading and processing…";
+  document.getElementById("csv-progress-fill").style.width = "30%";
+
+  try {
+    const formData = new FormData();
+    formData.append("csv_file", selectedCsvFile);
+    formData.append("rapidapi_key", rapidapiKey);
+
+    document.getElementById("csv-progress-fill").style.width = "60%";
+    const res = await fetch(`${BACKEND}/person-bulk`, { method: "POST", body: formData });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Server error: ${res.status}`);
+    }
+
+    document.getElementById("csv-progress-fill").style.width = "90%";
+    document.getElementById("csv-progress-text").textContent = "Download starting…";
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "person_search_results.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    document.getElementById("csv-progress-fill").style.width = "100%";
+    document.getElementById("csv-progress-text").textContent = "✅ Download complete!";
+    setPersonStatus("✅ Bulk search complete! CSV downloaded.");
+  } catch (err) {
+    setPersonStatus(`❌ ${err.message}`, true);
+    document.getElementById("csv-progress-text").textContent = "❌ Failed";
+  } finally {
+    document.getElementById("csv-upload-btn").disabled = false;
+  }
+}
+
+/* ── Handle URL Parameters (for Chrome Extension) ── */
+window.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get("q");
+  const autosearch = params.get("autosearch");
+  const filter = params.get("filter");
+
+  if (q) {
+    document.getElementById("query-input").value = q;
+  }
+  
+  if (autosearch === "1" && q) {
+    // Automatically trigger search
+    doSearch().then(() => {
+      // If a filter is requested, apply it after search finishes
+      if (filter && ['reliable', 'uncertain', 'hallucinated', 'all'].includes(filter)) {
+        filterCategory(filter);
+      }
+    });
+  }
+});
+
+</script>
+</body>
+</html>
+
