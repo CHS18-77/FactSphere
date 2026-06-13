@@ -32,3 +32,5 @@ FactSphere is an Agentic AI system that detects hallucinated or unreliable infor
 - 91% hallucination detection accuracy
 - 73% reduction in verification time
 - ~8 second response latency
+##Author and Co- Author
+Janesh D,Chethan H S
